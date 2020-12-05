@@ -28,14 +28,14 @@ type RedPandaClusterSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of RedPandaCluster. Edit RedPandaCluster_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	ClusterImage string `json:"clusterImage,omitempty"`
 }
 
 // RedPandaClusterStatus defines the observed state of RedPandaCluster
 type RedPandaClusterStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+	Nodes []string `json:"nodes"`
 }
 
 // +kubebuilder:object:root=true
