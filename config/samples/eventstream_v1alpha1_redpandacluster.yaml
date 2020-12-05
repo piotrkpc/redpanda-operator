@@ -1,0 +1,7 @@
+apiVersion: eventstream.vectorized.io/v1alpha1
+kind: RedPandaCluster
+metadata:
+  name: redpandacluster-sample
+spec:
+  # Add fields here
+  foo: bar

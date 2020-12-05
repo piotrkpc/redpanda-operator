@@ -1,0 +1,24 @@
+# permissions for end users to edit redpandaclusters.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: redpandacluster-editor-role
+rules:
+- apiGroups:
+  - eventstream.vectorized.io
+  resources:
+  - redpandaclusters
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - eventstream.vectorized.io
+  resources:
+  - redpandaclusters/status
+  verbs:
+  - get
