@@ -1,0 +1,7 @@
+domain: vectorized.io
+layout: go.kubebuilder.io/v2
+projectName: redpanda-operator
+repo: github.com/piotrkpc/redpanda-operator
+version: 3-alpha
+plugins:
+  go.sdk.operatorframework.io/v2-alpha: {}
