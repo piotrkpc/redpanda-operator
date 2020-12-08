@@ -28,7 +28,9 @@ type RedPandaClusterSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	ClusterImage string `json:"clusterImage,omitempty"`
+	Image string `json:"image"`
+	Name  string `json:"name"`
+	Size  int32  `json:"size"`
 }
 
 // RedPandaClusterStatus defines the observed state of RedPandaCluster

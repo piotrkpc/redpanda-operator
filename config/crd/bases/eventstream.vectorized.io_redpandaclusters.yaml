@@ -36,8 +36,12 @@ spec:
         spec:
           description: RedPandaClusterSpec defines the desired state of RedPandaCluster
           properties:
+            cluster_name:
+              type: string
             clusterImage:
               type: string
+          required:
+          - cluster_name
           type: object
         status:
           description: RedPandaClusterStatus defines the observed state of RedPandaCluster
