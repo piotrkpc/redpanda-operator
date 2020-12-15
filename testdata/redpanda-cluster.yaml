@@ -1,0 +1,9 @@
+---
+apiVersion: eventstream.vectorized.io/v1alpha1
+kind: RedPandaCluster
+metadata:
+  name: redpanda-test
+spec:
+  image: vectorized/redpanda
+  name: redpanda-test
+  size: 3
