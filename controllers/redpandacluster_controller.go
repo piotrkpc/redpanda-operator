@@ -18,7 +18,12 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"github.com/go-logr/logr"
+	"github.com/piotrkpc/redpanda-operator/pkg/reconciliation"
+	"github.com/piotrkpc/redpanda-operator/pkg/reconciliation/pipelines"
+	"github.com/piotrkpc/redpanda-operator/pkg/reconciliation/pipelines/k8s"
+	"github.com/piotrkpc/redpanda-operator/pkg/reconciliation/result"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -28,18 +33,30 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"reflect"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	eventstreamv1alpha1 "github.com/piotrkpc/redpanda-operator/api/v1alpha1"
 )
 
+// NOTE: Redesign idea
+// controller is configurable, it's an implementation detail for now,
+// based on the configuration,
+// - ReconcileContext is create - it's an Value object that that contains infromation for Concrete object implementing
+//   template pattern
+// - appropriate instance of concreate Something is created
+// That something will implement (?) template pattern
+// Concreate something can consist of other objects utilizing composition
+//
+// TODO: Esablish Template method
+// TODO: Create the something object using factory method
+
 // RedPandaClusterReconciler reconciles a RedPandaCluster object
 type RedPandaClusterReconciler struct {
 	client.Client
-	Log    logr.Logger
-	Scheme *runtime.Scheme
+	Log             logr.Logger
+	Scheme          *runtime.Scheme
+	SelectedBackend string
 }
 
 // +kubebuilder:rbac:groups=eventstream.vectorized.io,resources=redpandaclusters,verbs=get;list;watch;create;update;patch;delete
@@ -60,12 +77,25 @@ func (r *RedPandaClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, er
 
 	ctx := context.Background()
 	log := r.Log.WithValues("redpandacluster", req.NamespacedName)
+	coreReconciliationContext := CreateReconciliationContext(&req, r.Client, r.Scheme, r.Log, ctx)
+	var pipeline pipelines.PipelineReconciler
+	pipeline, err := CreateReconciliationPipeline(r.SelectedBackend, r.Log)
+	pipelineContext := pipeline.AddContextTo(coreReconciliationContext)
 
+	reconcileResult := pipeline.Reconcile(pipelineContext)
+	switch r := reconcileResult.(type) {
+	case result.ContinueReconcile:
+		log.Info("pipeline: reconciliation pipeline finished successfully")
+	default:
+		return r.Output()
+	}
+
+	// step 1. Check for CR
 	redPandaCluster := &eventstreamv1alpha1.RedPandaCluster{}
-	err := r.Get(ctx, req.NamespacedName, redPandaCluster)
+	err = r.Get(ctx, req.NamespacedName, redPandaCluster)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			log.Info("RedPandaCluster resource not statefulSetFound. Ignoring...")
+			log.Info("RedPandaCluster resource not found. Ignoring...")
 			return ctrl.Result{}, client.IgnoreNotFound(err)
 		}
 		log.Error(err, "unable to fetch RedPandaCluster")
@@ -137,20 +167,49 @@ func (r *RedPandaClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, er
 		log.Error(err, "unable to fetch PodList resource")
 		return ctrl.Result{}, err
 	}
-	var observedNodes []string
-	for _, item := range observedPods.Items {
-		observedNodes = append(observedNodes, item.Name)
+	for _, pod := range observedPods.Items {
+		redPandaCluster.Status.NodeStatuses[pod.String()] = eventstreamv1alpha1.RedPandaNodeStatus(pod.Status.Conditions[0].Status)
 	}
-	if !reflect.DeepEqual(observedNodes, redPandaCluster.Status.Nodes) {
-		redPandaCluster.Status.Nodes = observedNodes
-		err := r.Status().Update(ctx, redPandaCluster)
-		if err != nil {
-			log.Error(err, "Failed to update RedPandaClusterStatus")
-			return ctrl.Result{}, err
-		}
+	err = r.Status().Update(ctx, redPandaCluster)
+	if err != nil {
+		log.Error(err, "Failed to update RedPandaClusterStatus")
+		return ctrl.Result{}, err
 	}
 	log.Info("reconcile loop ends")
 	return ctrl.Result{}, nil
+}
+
+func CreateReconciliationPipeline(backend string, log logr.Logger) (pipelines.PipelineReconciler, error) {
+	switch backend {
+	case "k8s":
+		pipeline, err := k8s.PipelineFactory()
+		if err != nil {
+			return pipeline, nil
+		}
+		log.Error(err, "Error creating reconciliation pipeline")
+		return nil, err
+	default:
+		err := BackendNotSupported(backend)
+		log.Error(err, "Error creating reconciliation pipeline")
+		return nil, err
+	}
+}
+
+type BackendNotSupported string
+
+func (s BackendNotSupported) Error() string {
+	return fmt.Sprintf("reconciler: backend %s not supported", s)
+}
+
+func CreateReconciliationContext(req *ctrl.Request, client client.Client, scheme *runtime.Scheme, log logr.Logger, ctx context.Context) *reconciliation.CoreReconciliationContext {
+
+	return &reconciliation.CoreReconciliationContext{
+		Request:   req,
+		Client:    client,
+		Scheme:    scheme,
+		ReqLogger: log,
+		Ctx:       ctx,
+	}
 }
 
 func (r *RedPandaClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {

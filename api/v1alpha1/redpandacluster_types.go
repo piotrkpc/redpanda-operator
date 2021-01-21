@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -30,18 +31,56 @@ type RedPandaClusterSpec struct {
 
 	Image string `json:"image"`
 	Name  string `json:"name"`
-	Size  int32  `json:"size"`
+
+	// +kubebuilder:validation:Minimum=1
+	Size int32 `json:"size"`
 }
+type ClusterConditionType string
+
+const (
+	ClusterReady          ClusterConditionType = "Ready"
+	ClusterInitialized    ClusterConditionType = "Initialized"
+	ClusterReplacingNodes ClusterConditionType = "ReplacingNodes"
+	ClusterScalingUp      ClusterConditionType = "ScalingUp"
+	ClusterScalingDown    ClusterConditionType = "ScalingDown"
+	ClusterUpdating       ClusterConditionType = "Updating"
+	ClusterStopped        ClusterConditionType = "Stopped"
+	ClusterResuming       ClusterConditionType = "Resuming"
+	ClusterRollingRestart ClusterConditionType = "RollingRestart"
+	ClusterValid          ClusterConditionType = "Valid"
+)
+
+type ClusterCondition struct {
+	Type               ClusterConditionType   `json:"type"`
+	Status             corev1.ConditionStatus `json:"status"`
+	Reason             string                 `json:"reason"`
+	Message            string                 `json:"message"`
+	LastTransitionTime metav1.Time            `json:"lastTransitionTime,omitempty"`
+}
+
+type ProgressState string
+
+type RedPandaNodeStatus string
+
+type RedPandaStatusMap map[string]RedPandaNodeStatus
 
 // RedPandaClusterStatus defines the observed state of RedPandaCluster
 type RedPandaClusterStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
-	Nodes []string `json:"nodes"`
+	Conditions []ClusterCondition `json:"conditions,omitempty"`
+
+	// Last known progress state of the RedPanda Operator
+	// +optional
+	RedPandaOperatorProgress ProgressState `json:"redPandaOperatorProgress,omitempty"`
+
+	// +optional
+	NodeStatuses RedPandaStatusMap `json:"nodeStatuses"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:resource:shortName=rpkc
 
 // RedPandaCluster is the Schema for the redpandaclusters API
 type RedPandaCluster struct {

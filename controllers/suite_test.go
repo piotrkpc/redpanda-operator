@@ -70,6 +70,7 @@ var _ = BeforeSuite(func(done Done) {
 
 	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
 		Scheme: scheme.Scheme,
+		Host:   "127.0.0.1",
 	})
 	Expect(err).ToNot(HaveOccurred())
 
